@@ -1,32 +1,73 @@
 (function () {
   const content = document.getElementById("usage-content");
+  const WINDOW_MS = 5 * 60 * 60 * 1000;
 
   function fmt(n) {
     return Number(n).toLocaleString();
   }
 
-  function notRunningView() {
+  function unsupportedView() {
     content.innerHTML = "";
     const div = document.createElement("div");
     div.className = "empty-state";
-    div.innerHTML = `
-      <p>Local usage companion isn't running (couldn't reach ${window.CGIH_CONFIG.COMPANION_URL}).</p>
-      <p>Start it from the project directory:</p>
-      <code class="companion-cmd">node companion/usage-server.js</code>
-      <p><button id="usage-retry-btn">Try again</button></p>
-    `;
+    div.innerHTML = `<p>This browser doesn't support the File System Access API, which the Usage tab needs to read your local Claude Code logs. Use Chrome or Edge.</p>`;
     content.appendChild(div);
-    document.getElementById("usage-retry-btn").addEventListener("click", loadUsage);
+  }
+
+  function connectView() {
+    content.innerHTML = "";
+    const div = document.createElement("div");
+    div.className = "empty-state";
+    div.innerHTML = `<p>Connect your local Claude Code logs to see usage. You'll pick your <code>~/.claude/projects</code> folder once; the browser remembers it after that.</p>`;
+    const btn = document.createElement("button");
+    btn.textContent = "Connect usage logs";
+    btn.addEventListener("click", async () => {
+      try {
+        await window.UsageSource.connect();
+        await loadUsage();
+      } catch (err) {
+        // User cancelled the picker, or permission denied — stay on this view.
+        console.error("Failed to connect usage logs:", err);
+      }
+    });
+    div.appendChild(document.createElement("br"));
+    div.appendChild(btn);
+    content.appendChild(div);
+  }
+
+  function summarize(entries) {
+    const now = Date.now();
+    const windowStartMs = now - WINDOW_MS;
+    const inWindow = entries.filter((e) => e.timestamp >= windowStartMs && e.timestamp <= now);
+
+    const totals = { input_tokens: 0, output_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 };
+    const byModel = {};
+    let earliest = null;
+
+    for (const e of inWindow) {
+      const u = e.usage;
+      totals.input_tokens += u.input_tokens || 0;
+      totals.output_tokens += u.output_tokens || 0;
+      totals.cache_creation_input_tokens += u.cache_creation_input_tokens || 0;
+      totals.cache_read_input_tokens += u.cache_read_input_tokens || 0;
+
+      if (!byModel[e.model]) byModel[e.model] = { message_count: 0 };
+      byModel[e.model].message_count += 1;
+
+      if (earliest === null || e.timestamp < earliest) earliest = e.timestamp;
+    }
+
+    return {
+      window_start: earliest,
+      window_end: now,
+      message_count: inWindow.length,
+      tokens: { ...totals, total: totals.input_tokens + totals.output_tokens + totals.cache_creation_input_tokens + totals.cache_read_input_tokens },
+      by_model: byModel,
+    };
   }
 
   function render(data) {
     content.innerHTML = "";
-
-    const banner = document.createElement("div");
-    banner.className = "usage-banner";
-    banner.textContent =
-      "Estimate only: the 5-hour window is a rolling window from now, not necessarily aligned to Anthropic's actual reset boundary, and the dollar figure uses placeholder rates in companion/usage-server.js — edit them to match your plan.";
-    content.appendChild(banner);
 
     const stats = document.createElement("div");
     stats.className = "usage-stats";
@@ -37,7 +78,6 @@
       ["Cache read tokens", fmt(data.tokens.cache_read_input_tokens)],
       ["Cache write tokens", fmt(data.tokens.cache_creation_input_tokens)],
       ["Total tokens", fmt(data.tokens.total)],
-      ["Estimated cost", `$${data.estimated_cost_usd.toFixed(2)}`],
     ];
     for (const [label, value] of tiles) {
       const tile = document.createElement("div");
@@ -61,33 +101,38 @@
       heading.textContent = "By model:";
       content.appendChild(heading);
       for (const model of models) {
-        const m = data.by_model[model];
         const line = document.createElement("p");
         line.className = "status-line";
-        line.textContent = `${model}: ${fmt(m.message_count)} messages, ${fmt(
-          m.input_tokens + m.output_tokens + m.cache_creation_input_tokens + m.cache_read_input_tokens
-        )} tokens`;
+        line.textContent = `${model}: ${fmt(data.by_model[model].message_count)} messages`;
         content.appendChild(line);
       }
     }
 
+    const btnRow = document.createElement("div");
     const refreshBtn = document.createElement("button");
     refreshBtn.textContent = "Refresh";
     refreshBtn.addEventListener("click", loadUsage);
-    content.appendChild(refreshBtn);
+    btnRow.appendChild(refreshBtn);
+    content.appendChild(btnRow);
   }
 
   async function loadUsage() {
+    if (!window.UsageSource.isSupported()) {
+      unsupportedView();
+      return;
+    }
     content.innerHTML = '<p class="status-line">Loading…</p>';
+    const handle = await window.UsageSource.getConnectedHandle(false);
+    if (!handle) {
+      connectView();
+      return;
+    }
     try {
-      const res = await fetch(window.CGIH_CONFIG.COMPANION_URL + "/usage", {
-        signal: AbortSignal.timeout(1500),
-      });
-      if (!res.ok) throw new Error(`Companion returned ${res.status}`);
-      const data = await res.json();
-      render(data);
+      const { events } = await window.UsageSource.readUsageEntries(handle);
+      render(summarize(events));
     } catch (err) {
-      notRunningView();
+      console.error("Failed to read usage logs:", err);
+      connectView();
     }
   }
 

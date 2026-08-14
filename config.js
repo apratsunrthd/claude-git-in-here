@@ -11,7 +11,4 @@ window.CGIH_CONFIG = {
   // Cloudflare Worker relay URL, e.g. "https://claude-git-in-here.<subdomain>.workers.dev"
   // Fill in after `wrangler deploy`.
   WORKER_URL: "https://claude-git-in-here-relay.apratsunrthd.workers.dev",
-
-  // Local usage companion script endpoint.
-  COMPANION_URL: "http://localhost:4317",
 };
