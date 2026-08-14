@@ -6,9 +6,9 @@ A personal dashboard with two tabs:
 
 ## Architecture
 
-- `index.html` / `style.css` / `app.js` / `auth.js` / `repos.js` / `usage.js` / `config.js` — static frontend, hosted on GitHub Pages. No build step, no framework, no third-party JS (kept minimal on purpose, since this page holds your GitHub token in `localStorage`).
+- `index.html` / `style.css` / `app.js` / `auth.js` / `repos.js` / `config.js` — static frontend, hosted on GitHub Pages. No build step, no framework, no third-party JS (kept minimal on purpose, since this page holds your GitHub token in `localStorage`).
 - `worker/` — a small Cloudflare Worker that does two things a static page can't do safely: exchange the GitHub OAuth code for a token (needs a client secret), and call the Claude API to summarize repos (needs your Anthropic key kept off the public page).
-- `companion/` — a local Node script (zero dependencies) that reads `~/.claude/projects/*/*.jsonl` and serves a usage summary on `http://localhost:4317`. The hosted page fetches this directly — browsers exempt `localhost` from HTTPS mixed-content blocking, so no tunnel is needed. If it's not running, the Usage tab just says so.
+- `usage-source.js` / `usage-blocks.js` / `usage-calibration.js` / `usage.js` — the Usage tab. Reads `~/.claude/projects/*/*.jsonl` directly in the browser via the File System Access API (Chrome/Edge only) — no local script to run. See "Usage tab" below for how the quota bar works.
 
 ## Setup
 
@@ -58,26 +58,28 @@ The deploy output includes your Worker's `*.workers.dev` URL — that gets fille
 - Commit and push the filled-in config.
 - Give it a few minutes to propagate, then visit `https://<your-username>.github.io/claude-git-in-here/`.
 
-## Running the usage companion
+## Usage tab
 
-The Usage tab needs this running locally:
+The first time you open the tab, click **Connect usage logs** and pick your `~/.claude/projects` folder in the native file picker. The browser remembers that grant (via IndexedDB) so you won't be asked again unless you revoke it. This only works in Chromium browsers (Chrome, Edge) — the File System Access API isn't implemented in Safari or Firefox yet.
 
-```
-node companion/usage-server.js
-```
+**Window boundaries.** A 5-hour window opens on your *first message* in it, not the first assistant reply — the app derives boundaries from every turn's timestamp (not just usage-bearing assistant turns) so the countdown lines up with the real window instead of running late.
 
-Leave it running in a terminal while you use the app. It only reads local files and serves on `127.0.0.1:4317` — nothing leaves your machine.
+**The quota bar.** Anthropic doesn't expose the actual token/message ceiling for your plan's 5-hour window anywhere in the local logs, so there's no way to compute a true "% used" from raw token counts alone. Instead:
+1. Open your own Claude usage indicator (`/usage`) and note the % it shows.
+2. Paste that into the **Calibrate** field in the Usage tab at roughly the same moment.
+3. The app backs out an implied budget from your current window's token cost at that instant, and reuses it for future windows until you recalibrate.
 
-Cost estimates in the Usage tab use placeholder per-token rates in `companion/usage-server.js` (`PRICING_USD_PER_MTOK`) — edit them to match your actual plan/pricing before trusting the dollar figure.
+Before you calibrate, the bar falls back to your heaviest observed window so far (×1.25 headroom) if you have history, or a labelled placeholder floor if you don't — both are clearly marked as estimates, not Anthropic's real number.
+
+If a window was opened somewhere this machine has no record of (claude.ai, another device), use **Set override** to pin the real reset time instead of the locally-derived guess.
 
 ## Notes on scope and security
 
 - OAuth scope is `repo` (read+write on public and private repos) — the app only ever issues GET requests, but GitHub has no read-only scope that includes private repos, so the grant is broader than what's used. Edit `GITHUB_SCOPE` in `config.js` to `public_repo` if you'd rather exclude private repos and narrow the grant.
 - The GitHub token is stored in `localStorage` so you stay logged in across sessions. That's a real tradeoff: an XSS bug in this page could read it. Mitigations in place: no third-party JS, no bundler/dependencies in the frontend, and a `script-src 'self'` CSP. Revoke access anytime from https://github.com/settings/applications.
-- The 5-hour usage window is a rolling window from "now," not aligned to Anthropic's actual internal reset boundary — treat it as an approximation.
+- Usage log access is local-only: the File System Access grant lives in this browser profile, and file contents never leave your machine — only the numbers computed from them are rendered on the page.
 
 ## Redeploying after edits
 
 - Frontend changes: commit and push to `main`; GitHub Pages redeploys automatically.
 - Worker changes: `cd worker && npx wrangler deploy`.
-- Companion script changes: just restart `node companion/usage-server.js`.
