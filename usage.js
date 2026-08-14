@@ -1,6 +1,5 @@
 (function () {
   const content = document.getElementById("usage-content");
-  const WINDOW_MS = 5 * 60 * 60 * 1000;
 
   function fmt(n) {
     return Number(n).toLocaleString();
@@ -35,33 +34,27 @@
     content.appendChild(div);
   }
 
-  function summarize(entries) {
+  function summarize(events, activity) {
     const now = Date.now();
-    const windowStartMs = now - WINDOW_MS;
-    const inWindow = entries.filter((e) => e.timestamp >= windowStartMs && e.timestamp <= now);
+    const windows = window.UsageBlocks.computeBlocks(activity);
+    const blocks = window.UsageBlocks.summarizeBlocks(events, windows);
+    const block = window.UsageBlocks.currentBlock(blocks, now);
 
-    const totals = { input_tokens: 0, output_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 };
+    if (!block) {
+      return { active: false, window_end: now };
+    }
+
     const byModel = {};
-    let earliest = null;
-
-    for (const e of inWindow) {
-      const u = e.usage;
-      totals.input_tokens += u.input_tokens || 0;
-      totals.output_tokens += u.output_tokens || 0;
-      totals.cache_creation_input_tokens += u.cache_creation_input_tokens || 0;
-      totals.cache_read_input_tokens += u.cache_read_input_tokens || 0;
-
-      if (!byModel[e.model]) byModel[e.model] = { message_count: 0 };
-      byModel[e.model].message_count += 1;
-
-      if (earliest === null || e.timestamp < earliest) earliest = e.timestamp;
+    for (const [model, count] of Object.entries(block.byModel)) {
+      byModel[model] = { message_count: count };
     }
 
     return {
-      window_start: earliest,
-      window_end: now,
-      message_count: inWindow.length,
-      tokens: { ...totals, total: totals.input_tokens + totals.output_tokens + totals.cache_creation_input_tokens + totals.cache_read_input_tokens },
+      active: true,
+      window_start: block.start,
+      window_end: block.end,
+      message_count: block.messageCount,
+      tokens: { ...block.tokens, total: block.tokens.input_tokens + block.tokens.output_tokens + block.tokens.cache_creation_input_tokens + block.tokens.cache_read_input_tokens },
       by_model: byModel,
     };
   }
@@ -69,10 +62,22 @@
   function render(data) {
     content.innerHTML = "";
 
+    if (!data.active) {
+      const p = document.createElement("p");
+      p.className = "status-line";
+      p.textContent = "No active 5-hour window — no Claude Code activity in the last 5 hours.";
+      content.appendChild(p);
+      const refreshBtn = document.createElement("button");
+      refreshBtn.textContent = "Refresh";
+      refreshBtn.addEventListener("click", loadUsage);
+      content.appendChild(refreshBtn);
+      return;
+    }
+
     const stats = document.createElement("div");
     stats.className = "usage-stats";
     const tiles = [
-      ["Messages (last 5h)", fmt(data.message_count)],
+      ["Messages (this window)", fmt(data.message_count)],
       ["Input tokens", fmt(data.tokens.input_tokens)],
       ["Output tokens", fmt(data.tokens.output_tokens)],
       ["Cache read tokens", fmt(data.tokens.cache_read_input_tokens)],
@@ -87,12 +92,10 @@
     }
     content.appendChild(stats);
 
-    if (data.window_start) {
-      const p = document.createElement("p");
-      p.className = "status-line";
-      p.textContent = `Window: ${new Date(data.window_start).toLocaleTimeString()} – ${new Date(data.window_end).toLocaleTimeString()}`;
-      content.appendChild(p);
-    }
+    const p = document.createElement("p");
+    p.className = "status-line";
+    p.textContent = `Window opened ${new Date(data.window_start).toLocaleTimeString()} — resets at ${new Date(data.window_end).toLocaleTimeString()}`;
+    content.appendChild(p);
 
     const models = Object.keys(data.by_model || {});
     if (models.length) {
@@ -128,8 +131,8 @@
       return;
     }
     try {
-      const { events } = await window.UsageSource.readUsageEntries(handle);
-      render(summarize(events));
+      const { events, activity } = await window.UsageSource.readUsageEntries(handle);
+      render(summarize(events, activity));
     } catch (err) {
       console.error("Failed to read usage logs:", err);
       connectView();
