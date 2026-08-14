@@ -190,7 +190,7 @@
     const resetForm = document.createElement("form");
     resetForm.className = "calibrate-form";
     resetForm.innerHTML = `
-      <label>Know your real reset time (e.g. from claude.ai)? Override it:
+      <label>From Settings → Usage on claude.ai, enter the countdown it shows ("Resets in X hr Y min"):
         <input type="number" min="0" max="5" step="1" name="hours" placeholder="h" style="width:3.5em" />
         <input type="number" min="0" max="59" step="1" name="minutes" placeholder="m" style="width:3.5em" />
       </label>
