@@ -38,7 +38,16 @@
     const now = Date.now();
     const windows = window.UsageBlocks.computeBlocks(activity);
     const blocks = window.UsageBlocks.summarizeBlocks(events, windows);
-    const block = window.UsageBlocks.currentBlock(blocks, now);
+
+    const overrideEnd = window.UsageCalibration.loadResetOverride();
+    let block, boundarySource;
+    if (overrideEnd) {
+      block = window.UsageBlocks.buildBlockForWindow(events, overrideEnd - window.UsageBlocks.SPAN_MS, overrideEnd);
+      boundarySource = "override";
+    } else {
+      block = window.UsageBlocks.currentBlock(blocks, now);
+      boundarySource = "derived";
+    }
 
     if (!block) {
       return { active: false, window_end: now };
@@ -49,13 +58,22 @@
       byModel[model] = { message_count: count };
     }
 
+    const budget = window.UsageCalibration.resolveBudget(blocks);
+    const cost = window.UsageCalibration.costEquivalent(block.tokens);
+    const ratio = budget.budget > 0 ? cost / budget.budget : 0;
+
     return {
       active: true,
+      boundarySource,
       window_start: block.start,
       window_end: block.end,
       message_count: block.messageCount,
       tokens: { ...block.tokens, total: block.tokens.input_tokens + block.tokens.output_tokens + block.tokens.cache_creation_input_tokens + block.tokens.cache_read_input_tokens },
       by_model: byModel,
+      cost,
+      budget,
+      ratio,
+      severity: window.UsageCalibration.severity(ratio),
     };
   }
 
@@ -73,6 +91,29 @@
       content.appendChild(refreshBtn);
       return;
     }
+
+    const pctLine = document.createElement("p");
+    pctLine.className = "status-line";
+    pctLine.textContent = `~${Math.round(data.ratio * 100)}% of your calibrated 5-hour budget (${data.severity}) — ${data.budget.detail}`;
+    content.appendChild(pctLine);
+
+    const calForm = document.createElement("form");
+    calForm.className = "calibrate-form";
+    calForm.innerHTML = `
+      <label>What % does your Claude usage indicator (<code>/usage</code>) show right now?
+        <input type="number" min="0" max="500" step="1" name="pct" required />
+      </label>
+      <button type="submit">Calibrate</button>
+    `;
+    calForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const pct = Number(new FormData(calForm).get("pct"));
+      if (pct > 0) {
+        window.UsageCalibration.saveCalibration(pct, data.cost);
+        loadUsage();
+      }
+    });
+    content.appendChild(calForm);
 
     const stats = document.createElement("div");
     stats.className = "usage-stats";
@@ -94,8 +135,35 @@
 
     const p = document.createElement("p");
     p.className = "status-line";
-    p.textContent = `Window opened ${new Date(data.window_start).toLocaleTimeString()} — resets at ${new Date(data.window_end).toLocaleTimeString()}`;
+    const boundaryNote = data.boundarySource === "override" ? " (from your reset-time override)" : "";
+    p.textContent = `Window opened ${new Date(data.window_start).toLocaleTimeString()} — resets at ${new Date(data.window_end).toLocaleTimeString()}${boundaryNote}`;
     content.appendChild(p);
+
+    const resetForm = document.createElement("form");
+    resetForm.className = "calibrate-form";
+    resetForm.innerHTML = `
+      <label>Know your real reset time (e.g. from claude.ai)? Override it:
+        <input type="number" min="0" max="5" step="1" name="hours" placeholder="h" style="width:3.5em" />
+        <input type="number" min="0" max="59" step="1" name="minutes" placeholder="m" style="width:3.5em" />
+      </label>
+      <button type="submit">Set override</button>
+      <button type="button" class="clear-override-btn">Clear override</button>
+    `;
+    resetForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const fd = new FormData(resetForm);
+      const hours = Number(fd.get("hours") || 0);
+      const minutes = Number(fd.get("minutes") || 0);
+      if (hours || minutes) {
+        window.UsageCalibration.saveResetOverride(hours, minutes);
+        loadUsage();
+      }
+    });
+    resetForm.querySelector(".clear-override-btn").addEventListener("click", () => {
+      window.UsageCalibration.clearResetOverride();
+      loadUsage();
+    });
+    content.appendChild(resetForm);
 
     const models = Object.keys(data.by_model || {});
     if (models.length) {
