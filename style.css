@@ -207,6 +207,19 @@ button, .btn {
 .repo-meta dt { color: var(--text-dim); }
 .repo-meta dd { margin: 0; }
 
+.repo-language {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.lang-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
 .repo-card-footer {
   display: flex;
   gap: 0.6rem;

@@ -12,6 +12,51 @@
   let allRepos = [];
   const cardsByFullName = new Map();
 
+  // GitHub's own linguist colors for common languages; unlisted languages
+  // fall back to a neutral dot rather than a guessed/generated color.
+  const LANGUAGE_COLORS = {
+    JavaScript: "#f1e05a",
+    TypeScript: "#3178c6",
+    Python: "#3572A5",
+    Go: "#00ADD8",
+    Rust: "#dea584",
+    Java: "#b07219",
+    C: "#555555",
+    "C++": "#f34b7d",
+    "C#": "#178600",
+    Ruby: "#701516",
+    PHP: "#4F5D95",
+    Swift: "#F05138",
+    Kotlin: "#A97BFF",
+    HTML: "#e34c26",
+    CSS: "#563d7c",
+    Shell: "#89e051",
+    "Objective-C": "#438eff",
+    Dart: "#00B4AB",
+    Scala: "#c22d40",
+    Elixir: "#6e4a7e",
+    Haskell: "#5e5086",
+    Vue: "#41b883",
+    "Jupyter Notebook": "#DA5B0B",
+  };
+
+  const relativeTimeFormatter = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
+
+  function relativeTime(dateStr) {
+    const diffSec = Math.round((new Date(dateStr) - Date.now()) / 1000);
+    const abs = Math.abs(diffSec);
+    if (abs < 60) return relativeTimeFormatter.format(diffSec, "second");
+    const diffMin = Math.round(diffSec / 60);
+    if (Math.abs(diffMin) < 60) return relativeTimeFormatter.format(diffMin, "minute");
+    const diffHr = Math.round(diffMin / 60);
+    if (Math.abs(diffHr) < 24) return relativeTimeFormatter.format(diffHr, "hour");
+    const diffDay = Math.round(diffHr / 24);
+    if (Math.abs(diffDay) < 30) return relativeTimeFormatter.format(diffDay, "day");
+    const diffMonth = Math.round(diffDay / 30);
+    if (Math.abs(diffMonth) < 12) return relativeTimeFormatter.format(diffMonth, "month");
+    return relativeTimeFormatter.format(Math.round(diffMonth / 12), "year");
+  }
+
   const SORTERS = {
     updated: (a, b) => new Date(b.updated_at) - new Date(a.updated_at),
     stars: (a, b) => (b.stargazers_count || 0) - (a.stargazers_count || 0),
@@ -141,11 +186,23 @@
     nameLink.href = repo.html_url;
 
     article.querySelector(".repo-visibility").textContent = repo.private ? "private" : "public";
-    article.querySelector(".repo-language").textContent = repo.language || "—";
+
+    const langDot = article.querySelector(".lang-dot");
+    if (repo.language) {
+      langDot.hidden = false;
+      langDot.style.background = LANGUAGE_COLORS[repo.language] || "var(--text-dim)";
+    }
+    article.querySelector(".lang-name").textContent = repo.language || "—";
+
     article.querySelector(".repo-stars").textContent = repo.stargazers_count ?? "—";
-    article.querySelector(".repo-updated").textContent = repo.updated_at
-      ? new Date(repo.updated_at).toLocaleDateString()
-      : "—";
+
+    const updatedEl = article.querySelector(".repo-updated");
+    if (repo.updated_at) {
+      updatedEl.textContent = relativeTime(repo.updated_at);
+      updatedEl.title = new Date(repo.updated_at).toLocaleString();
+    } else {
+      updatedEl.textContent = "—";
+    }
 
     const vscodeLink = article.querySelector(".vscode-link");
     vscodeLink.href = `vscode://vscode.git/clone?url=${encodeURIComponent(repo.clone_url)}`;
