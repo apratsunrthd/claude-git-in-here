@@ -5,6 +5,21 @@
     return Number(n).toLocaleString();
   }
 
+  const SEVERITY_LABEL = {
+    good: "On track",
+    warning: "Approaching your limit",
+    serious: "Close to your limit",
+    critical: "At or over your limit",
+  };
+
+  // Fixed hue order, matching the app's validated categorical palette.
+  const COMPOSITION_SEGMENTS = [
+    { key: "input_tokens", label: "Input", color: "#3987e5" },
+    { key: "output_tokens", label: "Output", color: "#d95926" },
+    { key: "cache_read_input_tokens", label: "Cache read", color: "#199e70" },
+    { key: "cache_creation_input_tokens", label: "Cache write", color: "#c98500" },
+  ];
+
   function unsupportedView() {
     content.innerHTML = "";
     const div = document.createElement("div");
@@ -92,10 +107,47 @@
       return;
     }
 
-    const pctLine = document.createElement("p");
-    pctLine.className = "status-line";
-    pctLine.textContent = `~${Math.round(data.ratio * 100)}% of your calibrated 5-hour budget (${data.severity}) — ${data.budget.detail}`;
-    content.appendChild(pctLine);
+    const pct = Math.round(data.ratio * 100);
+    const fillWidth = Math.max(0, Math.min(1, data.ratio)) * 100;
+
+    const quotaCard = document.createElement("div");
+    quotaCard.className = "quota-card";
+    quotaCard.innerHTML = `
+      <div class="quota-headline">
+        <span class="quota-pct">${pct}%</span>
+        <span class="quota-label" data-severity="${data.severity}">${SEVERITY_LABEL[data.severity]}</span>
+      </div>
+      <div class="quota-track">
+        <div class="quota-fill" data-severity="${data.severity}" style="width:${fillWidth}%"></div>
+      </div>
+      <p class="quota-detail">${data.budget.detail}</p>
+    `;
+    content.appendChild(quotaCard);
+
+    const composition = document.createElement("div");
+    composition.className = "composition-bar";
+    const total = data.tokens.total || 1;
+    for (const seg of COMPOSITION_SEGMENTS) {
+      const value = data.tokens[seg.key] || 0;
+      if (value <= 0) continue;
+      const el = document.createElement("div");
+      el.className = "segment";
+      el.style.width = `${(value / total) * 100}%`;
+      el.style.background = seg.color;
+      el.title = `${seg.label}: ${fmt(value)} tokens`;
+      composition.appendChild(el);
+    }
+    content.appendChild(composition);
+
+    const legend = document.createElement("ul");
+    legend.className = "composition-legend";
+    for (const seg of COMPOSITION_SEGMENTS) {
+      const value = data.tokens[seg.key] || 0;
+      const li = document.createElement("li");
+      li.innerHTML = `<span class="swatch" style="background:${seg.color}"></span>${seg.label}: ${fmt(value)}`;
+      legend.appendChild(li);
+    }
+    content.appendChild(legend);
 
     const calForm = document.createElement("form");
     calForm.className = "calibrate-form";
@@ -119,10 +171,6 @@
     stats.className = "usage-stats";
     const tiles = [
       ["Messages (this window)", fmt(data.message_count)],
-      ["Input tokens", fmt(data.tokens.input_tokens)],
-      ["Output tokens", fmt(data.tokens.output_tokens)],
-      ["Cache read tokens", fmt(data.tokens.cache_read_input_tokens)],
-      ["Cache write tokens", fmt(data.tokens.cache_creation_input_tokens)],
       ["Total tokens", fmt(data.tokens.total)],
     ];
     for (const [label, value] of tiles) {

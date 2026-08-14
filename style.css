@@ -248,6 +248,108 @@ button, .btn {
   margin-bottom: 1.25rem;
 }
 
+.quota-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  margin-bottom: 1.25rem;
+}
+
+.quota-headline {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  margin-bottom: 0.5rem;
+}
+
+.quota-headline .quota-pct {
+  font-size: 2.25rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.quota-headline .quota-label {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.quota-track {
+  position: relative;
+  height: 14px;
+  border-radius: 7px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  margin-bottom: 0.5rem;
+}
+
+.quota-fill {
+  height: 100%;
+  border-radius: 7px 0 0 7px;
+  transition: width 0.4s ease, background-color 0.4s ease;
+}
+
+.quota-fill[data-severity="good"] { background: #0ca30c; }
+.quota-fill[data-severity="warning"] { background: #fab219; }
+.quota-fill[data-severity="serious"] { background: #ec835a; }
+.quota-fill[data-severity="critical"] { background: #d03b3b; }
+
+.quota-label[data-severity="good"] { color: #0ca30c; }
+.quota-label[data-severity="warning"] { color: #fab219; }
+.quota-label[data-severity="serious"] { color: #ec835a; }
+.quota-label[data-severity="critical"] { color: #d03b3b; }
+
+.quota-detail {
+  color: var(--text-dim);
+  font-size: 0.82rem;
+  margin: 0;
+}
+
+.quota-reset {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  margin: 0.4rem 0 0;
+}
+
+.composition-bar {
+  display: flex;
+  height: 10px;
+  border-radius: 5px;
+  overflow: hidden;
+  gap: 2px;
+  background: var(--surface-2);
+  margin-bottom: 0.6rem;
+}
+
+.composition-bar .segment {
+  height: 100%;
+}
+
+.composition-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.9rem;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  margin: 0 0 1.25rem;
+  padding: 0;
+  list-style: none;
+}
+
+.composition-legend li {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.composition-legend .swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  display: inline-block;
+}
+
 .calibrate-form {
   display: flex;
   align-items: center;
