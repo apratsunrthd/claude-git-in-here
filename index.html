@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://api.github.com https://github.com http://localhost:* http://127.0.0.1:* https://*.workers.dev; img-src 'self' https://avatars.githubusercontent.com data:;" />
+<title>Claude, git in here!</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<header class="topbar">
+  <h1>Claude, git in here!</h1>
+  <div id="auth-area"></div>
+</header>
+
+<div id="global-error" class="status-line error" hidden></div>
+
+<nav class="tabs" id="tabs">
+  <button class="tab-btn" data-tab="repos" id="tab-btn-repos">Repos</button>
+  <button class="tab-btn" data-tab="usage" id="tab-btn-usage">Usage</button>
+</nav>
+
+<main>
+  <section id="tab-repos" class="tab-panel">
+    <div id="repos-signed-out" class="empty-state" hidden>
+      <p>Log in with GitHub to see your repos.</p>
+    </div>
+    <div id="repos-status" class="status-line" hidden></div>
+    <div id="repos-list" class="repo-grid"></div>
+  </section>
+
+  <section id="tab-usage" class="tab-panel" hidden>
+    <div id="usage-content"></div>
+  </section>
+</main>
+
+<template id="repo-card-template">
+  <article class="repo-card">
+    <header class="repo-card-header">
+      <a class="repo-name" target="_blank" rel="noopener"></a>
+      <span class="repo-visibility"></span>
+    </header>
+    <p class="repo-summary">Generating summary…</p>
+    <dl class="repo-meta">
+      <div><dt>Language</dt><dd class="repo-language">—</dd></div>
+      <div><dt>Stars</dt><dd class="repo-stars">—</dd></div>
+      <div><dt>Updated</dt><dd class="repo-updated">—</dd></div>
+    </dl>
+    <footer class="repo-card-footer">
+      <a class="vscode-link" title="Open in VS Code">Open in VS Code</a>
+      <a class="github-link" target="_blank" rel="noopener">View on GitHub</a>
+    </footer>
+  </article>
+</template>
+
+<script src="config.js"></script>
+<script src="auth.js"></script>
+<script src="repos.js"></script>
+<script src="usage.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
