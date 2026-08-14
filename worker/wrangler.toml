@@ -1,6 +1,7 @@
 name = "claude-git-in-here-relay"
 main = "src/index.js"
 compatibility_date = "2025-01-01"
+account_id = "521b56fe35ba4deded493d5a8392e637"
 
 [vars]
 # Origin of the deployed GitHub Pages site (no trailing slash, no path).
@@ -9,7 +10,7 @@ ALLOWED_ORIGIN = "https://apratsunrthd.github.io"
 
 # GitHub OAuth App client ID (public identifier — must match config.js's
 # GITHUB_CLIENT_ID). Not secret, safe to commit.
-GITHUB_CLIENT_ID = ""
+GITHUB_CLIENT_ID = "Ov23linm9ZLwhK2pWDep"
 
 # Secrets (never commit these — set via `wrangler secret put <NAME>`):
 #   GITHUB_CLIENT_SECRET  — from the GitHub OAuth App
