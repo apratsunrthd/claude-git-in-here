@@ -3,8 +3,53 @@
   const signedOutEl = document.getElementById("repos-signed-out");
   const statusEl = document.getElementById("repos-status");
   const template = document.getElementById("repo-card-template");
+  const toolbarEl = document.getElementById("repos-toolbar");
+  const searchEl = document.getElementById("repos-search");
+  const sortEl = document.getElementById("repos-sort");
+  const emptyFilteredEl = document.getElementById("repos-empty-filtered");
 
   let loaded = false;
+  let allRepos = [];
+  const cardsByFullName = new Map();
+
+  const SORTERS = {
+    updated: (a, b) => new Date(b.updated_at) - new Date(a.updated_at),
+    stars: (a, b) => (b.stargazers_count || 0) - (a.stargazers_count || 0),
+    name: (a, b) => a.full_name.localeCompare(b.full_name),
+  };
+
+  function matchesQuery(repo, query) {
+    if (!query) return true;
+    return (
+      repo.full_name.toLowerCase().includes(query) ||
+      (repo.description || "").toLowerCase().includes(query)
+    );
+  }
+
+  function applyFilters() {
+    const query = searchEl.value.trim().toLowerCase();
+    const sortFn = SORTERS[sortEl.value] || SORTERS.updated;
+    const filtered = allRepos.filter((r) => matchesQuery(r, query)).sort(sortFn);
+
+    for (const repo of filtered) {
+      const card = cardsByFullName.get(repo.full_name);
+      if (card) {
+        card.hidden = false;
+        listEl.appendChild(card); // moves existing node — doesn't recreate it or re-trigger its summary fetch
+      }
+    }
+    for (const repo of allRepos) {
+      if (!filtered.includes(repo)) {
+        const card = cardsByFullName.get(repo.full_name);
+        if (card) card.hidden = true;
+      }
+    }
+
+    emptyFilteredEl.hidden = filtered.length > 0 || allRepos.length === 0;
+  }
+
+  searchEl.addEventListener("input", applyFilters);
+  sortEl.addEventListener("change", applyFilters);
 
   function setStatus(text, isError) {
     if (!text) {
@@ -19,6 +64,11 @@
   function reset() {
     loaded = false;
     listEl.innerHTML = "";
+    cardsByFullName.clear();
+    allRepos = [];
+    toolbarEl.hidden = true;
+    emptyFilteredEl.hidden = true;
+    searchEl.value = "";
     setStatus("");
   }
 
@@ -71,9 +121,12 @@
         setStatus("No repositories found.");
         return;
       }
+      allRepos = repos;
       for (const repo of repos) {
         renderCard(repo, token);
       }
+      toolbarEl.hidden = false;
+      applyFilters();
     } catch (err) {
       setStatus(err.message || "Failed to load repositories.", true);
       loaded = false;
@@ -82,25 +135,27 @@
 
   function renderCard(repo, token) {
     const node = template.content.cloneNode(true);
-    const nameLink = node.querySelector(".repo-name");
+    const article = node.querySelector(".repo-card");
+    const nameLink = article.querySelector(".repo-name");
     nameLink.textContent = repo.full_name;
     nameLink.href = repo.html_url;
 
-    node.querySelector(".repo-visibility").textContent = repo.private ? "private" : "public";
-    node.querySelector(".repo-language").textContent = repo.language || "—";
-    node.querySelector(".repo-stars").textContent = repo.stargazers_count ?? "—";
-    node.querySelector(".repo-updated").textContent = repo.updated_at
+    article.querySelector(".repo-visibility").textContent = repo.private ? "private" : "public";
+    article.querySelector(".repo-language").textContent = repo.language || "—";
+    article.querySelector(".repo-stars").textContent = repo.stargazers_count ?? "—";
+    article.querySelector(".repo-updated").textContent = repo.updated_at
       ? new Date(repo.updated_at).toLocaleDateString()
       : "—";
 
-    const vscodeLink = node.querySelector(".vscode-link");
+    const vscodeLink = article.querySelector(".vscode-link");
     vscodeLink.href = `vscode://vscode.git/clone?url=${encodeURIComponent(repo.clone_url)}`;
 
-    const githubLink = node.querySelector(".github-link");
+    const githubLink = article.querySelector(".github-link");
     githubLink.href = repo.html_url;
 
-    const summaryEl = node.querySelector(".repo-summary");
-    listEl.appendChild(node);
+    const summaryEl = article.querySelector(".repo-summary");
+    cardsByFullName.set(repo.full_name, article);
+    listEl.appendChild(article); // initial placement; applyFilters() reorders
 
     requestSummary(repo, token, summaryEl);
   }

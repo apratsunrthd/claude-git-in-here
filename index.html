@@ -26,6 +26,15 @@
       <p>Log in with GitHub to see your repos.</p>
     </div>
     <div id="repos-status" class="status-line" hidden></div>
+    <div class="repos-toolbar" id="repos-toolbar" hidden>
+      <input type="search" id="repos-search" placeholder="Filter by name or description…" />
+      <select id="repos-sort">
+        <option value="updated">Recently updated</option>
+        <option value="stars">Most stars</option>
+        <option value="name">Name A–Z</option>
+      </select>
+    </div>
+    <p class="status-line" id="repos-empty-filtered" hidden>No repositories match your filter.</p>
     <div id="repos-list" class="repo-grid"></div>
   </section>
 
