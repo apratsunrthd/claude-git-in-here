@@ -186,6 +186,18 @@
     nameLink.href = repo.html_url;
 
     article.querySelector(".repo-visibility").textContent = repo.private ? "private" : "public";
+    article.querySelector(".badge-fork").hidden = !repo.fork;
+    article.querySelector(".badge-archived").hidden = !repo.archived;
+
+    const topicsEl = article.querySelector(".repo-topics");
+    if (Array.isArray(repo.topics) && repo.topics.length > 0) {
+      topicsEl.hidden = false;
+      for (const topic of repo.topics.slice(0, 6)) {
+        const li = document.createElement("li");
+        li.textContent = topic;
+        topicsEl.appendChild(li);
+      }
+    }
 
     const langDot = article.querySelector(".lang-dot");
     if (repo.language) {

@@ -177,13 +177,45 @@ button, .btn {
 
 .repo-name:hover { text-decoration: underline; }
 
-.repo-visibility {
+.repo-badges {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.repo-visibility,
+.badge-fork,
+.badge-archived {
   font-size: 0.7rem;
   color: var(--text-dim);
   border: 1px solid var(--border);
   border-radius: 4px;
   padding: 0.1rem 0.4rem;
   white-space: nowrap;
+}
+
+.badge-archived {
+  color: #ec835a;
+  border-color: #ec835a;
+}
+
+.repo-topics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: -0.3rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.repo-topics li {
+  font-size: 0.72rem;
+  color: var(--accent);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.1rem 0.45rem;
 }
 
 .repo-summary {
